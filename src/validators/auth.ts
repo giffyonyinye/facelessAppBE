@@ -11,4 +11,10 @@ export const loginSchema = z.object({
     password: z.string().min(1, {message: 'Password is required'})
 });
 
+export const pseudonymousSchema = z.object({
+    nickname: z.string().min(1, {message: "Nickname is required"})
+})
+
 export type LoginInput = z.infer<typeof loginSchema>;
+export type registerInput = z.infer<typeof registerSchema>;
+export type pseudonymousInput = z.infer<typeof pseudonymousSchema>;

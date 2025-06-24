@@ -1,9 +1,11 @@
 import bcrypt from 'bcryptjs';
 import jwt from "jsonwebtoken";
 import User from "../models/User";
-import { LoginInput } from "../validators/auth";
+import { LoginInput, registerInput, pseudonymousInput } from "../validators/auth";
+import Session from '../models/Session';
+import { v4 as uuidv4 } from 'uuid';
 
-const JWT_SECRET = process.env.JWT_SECRET!;
+const JWT_SECRET = process.env.JWT_SECRET! || '1234567890qwerty';
 if (!JWT_SECRET) throw new Error('JWT_SECRET not defined');
 
 export const authenticateUser = async ({email, password}: LoginInput) => {
@@ -23,4 +25,29 @@ export const authenticateUser = async ({email, password}: LoginInput) => {
     }
 
     return {token, user: userPayload}
+};
+
+export const registerUser = async ({email, password, nickname}: registerInput) => {
+    const isExistingUser = await User.findOne({email: email.toLowerCase()}).lean();
+    if(!isExistingUser) throw new Error("Email already in use")
+     const hashedPassword = await bcrypt.hash(password, 12);
+     const user = await User.create({
+         email: email.toLowerCase(),
+         password: hashedPassword,
+         nickname: nickname.trim()
+       })
+    const token = jwt.sign({userId: user._id, email: user.email}, JWT_SECRET, {expiresIn: '7d'})
+
+    return {token, user}
+};
+
+export const pseudonymousUser = async ({nickname} : pseudonymousInput) => {
+    const isExistingGuestUser = await Session.findOne({nickname: nickname.toLowerCase()}).lean();
+    if(isExistingGuestUser) throw new Error("Nickname already in use");
+    const token = uuidv4();
+    const guestUser = Session.create({
+        nickname: nickname.trim()
+    })
+
+    return {token, guestUser}
 }

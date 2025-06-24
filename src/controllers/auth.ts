@@ -1,24 +1,70 @@
 import { Request, Response } from "express";
-import { loginSchema } from "../validators/auth";
-import { authenticateUser } from "../services.ts/auth";
+import { loginSchema, pseudonymousSchema, registerSchema } from "../validators/auth";
+import { authenticateUser, pseudonymousUser, registerUser } from "../services.ts/auth";
 
-export const login = async (req: Request, res: Response) => {
+const login = async (req: Request, res: Response): Promise<void> => {
     const parseResult = loginSchema.safeParse(req.body);
     
     if(!parseResult.success) {
         const errors = parseResult.error.flatten().fieldErrors
-        return res.status(400).json({error: "Validation failed", details: errors})
+         res.status(400).json({error: "Validation failed", details: errors})
+         return;
     }
     
     try {
         const {token, user} = await authenticateUser(parseResult.data);
-        return res.status(200).json({token, user});
+        res.status(200).json({token, user});
+        return;
     } catch (error) {
         if(error instanceof Error && error.message === "Invalid credentials"){
-            return res.status(401).json({error: error})
+            res.status(401).json({error: error});
+            return;
         };
         console.error('[LOGIN ERROR]:', error);
-        return res.status(500).json({ error: 'Login failed. Please try again later.' });
+        res.status(500).json({ error: 'Login failed. Please try again later.' });
+        return;
     }
 };
 
+const register = async (req: Request, res: Response): Promise<void> => {
+    const parseResult = registerSchema.safeParse(req.body);
+    if(!parseResult.success) {
+        const errors = parseResult.error.flatten().fieldErrors;
+        res.status(400).json({error: errors});
+        return;
+    }
+    try {
+        const {token, user} = await registerUser(parseResult.data);
+        res.status(201).json({token, user});
+        return;
+    } catch (error) {
+        if(error instanceof Error && error.message === "Email already in use") {
+            res.status(409).json({error: error});
+            return
+        };
+        res.status(500).json({error: "Registration failed"});
+    }
+};
+
+const pseudonymous = async (req: Request, res: Response): Promise<void> => {
+    const parseResult = pseudonymousSchema.safeParse(req.body);
+    if(!parseResult.success){
+        const errors = parseResult.error.flatten().fieldErrors;
+        res.status(400).json({error: errors});
+        return;
+    }
+
+    try {
+        const {token, guestUser} = await pseudonymousUser(parseResult.data);
+        res.status(201).json({token, guestUser});
+        return;
+    } catch (error) {
+        if(error instanceof Error && error.message === "Nickname already in use"){
+            res.status(409).json({error : error});
+            return
+        }
+        res.status(500).json({error: ""})
+    }
+}
+
+export { login, register, pseudonymous };
